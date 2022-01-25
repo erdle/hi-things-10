@@ -1,20 +1,17 @@
 import "@babel/polyfill";
 import "isomorphic-fetch";
 
-import Shopify, { ApiVersion } from "@shopify/shopify-api";
+import Shopify, { ApiVersion, Session } from "@shopify/shopify-api";
 import createShopifyAuth, { verifyRequest } from "@shopify/koa-shopify-auth";
+
 
 import Koa from "koa";
 import Router from "koa-router";
 import dotenv from "dotenv";
 
 import next from "next";
-import { webhooks } from "../webhooks/index.js";
 
-//ShopifyCustomSessionWithFirebase 
-import { storeCallBack, loadCallback, deleteCallback, } from "./firebase/firebase.utils";
-
-
+// TODO - add back Firebase stuff in terms of the storeCallback and loadCallback and deleteCallback 
 // --------------------------------------------------
 
 dotenv.config();
@@ -30,88 +27,47 @@ Shopify.Context.initialize({
   API_SECRET_KEY: process.env.SHOPIFY_API_SECRET,
   SCOPES: process.env.SCOPES.split(","),
   HOST_NAME: process.env.HOST.replace(/https:\/\/|\/$/g, ""),
-  API_VERSION: "2022-01",
+  API_VERSION: ApiVersion.October20,
   IS_EMBEDDED_APP: true,
   SESSION_STORAGE: new Shopify.Session.CustomSessionStorage( storeCallBack, loadCallback, deleteCallback ),
 });
 
-// Reload webhooks after server restart
-//TODO 
-// explore more 
-for (const webhook of webhooks) {
-  Shopify.Webhooks.Registry.webhookRegistry.push({
-    path: webhook.path,
-    topic: webhook.topic,
-    webhookHandler: webhook.webhookHandler,
-  });
-}
 
 app.prepare().then(async () => {
   const server = new Koa();
   const router = new Router();
   server.keys = [Shopify.Context.API_SECRET_KEY];
 
-  let useOfflineAccessToken = false;
 
-  // Uncomment to use offline and online access tokens
 
-  // useOfflineAccessToken = true;
-
-  // server.use(
-  //   createShopifyAuth({
-  //     accessMode: "offline",
-  //     prefix: "/install",
-  //     async afterAuth(ctx) {
-  //       const { shop, accessToken, scope } = ctx.state.shopify;
-  //       const host = ctx.query.host;
-
-  //       const result = await ShopModel.findOne({ shop: shop });
-
-  //       if (!result) {
-  //         await ShopModel.create({
-  //           shop: shop,
-  //           accessToken: cryption.encrypt(accessToken),
-  //           scope: scope,
-  //         }).then(() => ctx.redirect(`/auth?shop=${shop}&host=${host}`));
-  //       } else {
-  //         ctx.redirect(`/auth?shop=${shop}&host=${host}`);
-  //       }
-  //     },
-  //   })
-  // );
+   useOfflineAccessToken = true;
 
   server.use(
     createShopifyAuth({
+    accessMode: "offline",
+      prefix: "/install",
       async afterAuth(ctx) {
-
-        // Access token and shop available in ctx.state.shopify
         const { shop, accessToken, scope } = ctx.state.shopify;
         const host = ctx.query.host;
-        // ACTIVE_SHOPIFY_SHOPS[shop] = scope;
 
-        for (const webhook of webhooks) {
-          const response = await Shopify.Webhooks.Registry.register({
-            shop,
-            accessToken,
-            path: webhook.path,
-            topic: webhook.topic,
-            webhookHandler: webhook.webhookHandler,
-          });
+        // TODO - change this to use Firebase Utilities to see 
+        // TODO pull in from utilities like the other bitches 
+        const result = await ShopModel.findOne({ shop: shop });
 
-          if (!response.success) {
-            console.log(
-              `Failed to register ${webhook.topic} webhook: ${response.result}`
-            );
-          } else {
-            console.log(`Successfully registered ${webhook.topic} webhook.`);
-          }
+        if (!result) {
+        await ShopModel.create({
+          shop: shop,
+          accessToken: cryption.encrypt(accessToken),
+          scope: scope,
+        }).then(() => ctx.redirect(`/auth?shop=${shop}&host=${host}`));
+        } else {
+          ctx.redirect(`/auth?shop=${shop}&host=${host}`);
         }
-
-        // Redirect to app with shop parameter upon auth
-        ctx.redirect(`/?shop=${shop}&host=${host}`);
       },
     })
   );
+
+
 
   const handleRequest = async (ctx) => {
     await handle(ctx.req, ctx.res);
@@ -177,35 +133,7 @@ app.prepare().then(async () => {
       
       //----------
 
-      //TODO - re check this - it's Mongo specific with ShopModel
-    if (useOfflineAccessToken) {
-      const isInstalled = await ShopModel.countDocuments({ shop });
 
-      if (isInstalled === 0) {
-        ctx.redirect(`/install/auth?shop=${shop}`);
-      } else {
-        const findShopCount = await SessionModel.countDocuments({ shop });
-
-        if (findShopCount < 2) {
-          await SessionModel.deleteMany({ shop });
-          ctx.redirect(`/auth?shop=${shop}`);
-        } else {
-          await handleRequest(ctx);
-        }
-      }
-    } else {
-      const findShopCount = await SessionModel.countDocuments({ shop });
-
-      if (findShopCount < 2) {
-        await SessionModel.deleteMany({ shop });
-        ctx.redirect(`/auth?shop=${shop}`);
-      } else {
-        await handleRequest(ctx);
-      }
-    }
-
-    //--------------  
-    // quaratined above 
 
   });
 

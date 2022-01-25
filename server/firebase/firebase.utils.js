@@ -1,41 +1,9 @@
-import { initializeApp } from "firebase/app";
-import { 
-  getFirestore, 
-  collection,
-  doc, 
-  query, 
-  where, 
-  getDocs, 
-  getDoc,
-  setDoc} from "firebase/firestore";
 
-  //import "firebase/auth";
-  //import "firebase/storage";
-
-//used for creating new session 
-import Shopify from '@shopify/shopify-api';
-import { Session } from "@shopify/shopify-api/dist/auth/session";
 
 //Firestore Data 
 //TODO - put into env file 
-let firebaseConfig = {
-  apiKey: "AIzaSyBaaA3ppumdtOzHyQUwTh1OLRPRSEkkhm8",
-  authDomain: "hi-things-shopify-app.firebaseapp.com",
-  projectId: "hi-things-shopify-app",
-  storageBucket: "hi-things-shopify-app.appspot.com",
-  messagingSenderId: "218616689255",
-  appId: "1:218616689255:web:3ada5de7d4116216ad1ac2",
-  measurementId: "G-RKHPSJ8ZSH"
-};
-console.log('firebaseConfig ------------------------------')
-console.log(firebaseConfig)
 
-// init firebase app 
-initializeApp(firebaseConfig);
 
-// init firestore
-//use db any time we need to get data from firestore
-const db = getFirestore();
 
 
 export const storeCallBack = async (session) => {
