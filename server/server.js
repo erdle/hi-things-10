@@ -4,38 +4,18 @@ import "isomorphic-fetch";
 import Shopify, { ApiVersion } from "@shopify/shopify-api";
 import createShopifyAuth, { verifyRequest } from "@shopify/koa-shopify-auth";
 
-import Cryptr from "cryptr";
 import Koa from "koa";
 import Router from "koa-router";
 import dotenv from "dotenv";
-import mongoose from "mongoose";
+
 import next from "next";
 import { webhooks } from "../webhooks/index.js";
 
-const sessionStorage = require("./../utils/sessionStorage.js");
-const SessionModel = require("./../models/SessionModel.js");
-const ShopModel = require("./../models/ShopModel.js");
+//ShopifyCustomSessionWithFirebase 
+import { storeCallBack, loadCallback, deleteCallback, } from "./firebase/firebase.utils";
 
-const cryption = new Cryptr(process.env.ENCRYPTION_STRING);
 
-// MongoDB Connection
-const mongoUrl =
-  process.env.MONGO_URL || "mongodb://127.0.0.1:27017/shopify-app";
-
-mongoose.connect(
-  mongoUrl,
-  {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  },
-  (err) => {
-    if (err) {
-      console.log("--> There was an error connecting to MongoDB:", err.message);
-    } else {
-      console.log("--> Connected to MongoDB");
-    }
-  }
-);
+// --------------------------------------------------
 
 dotenv.config();
 const port = parseInt(process.env.PORT, 10) || 8081;
@@ -52,11 +32,12 @@ Shopify.Context.initialize({
   HOST_NAME: process.env.HOST.replace(/https:\/\/|\/$/g, ""),
   API_VERSION: "2022-01",
   IS_EMBEDDED_APP: true,
-  SESSION_STORAGE: sessionStorage,
+  SESSION_STORAGE: new Shopify.Session.CustomSessionStorage( storeCallBack, loadCallback, deleteCallback ),
 });
 
 // Reload webhooks after server restart
-
+//TODO 
+// explore more 
 for (const webhook of webhooks) {
   Shopify.Webhooks.Registry.webhookRegistry.push({
     path: webhook.path,
@@ -102,6 +83,7 @@ app.prepare().then(async () => {
   server.use(
     createShopifyAuth({
       async afterAuth(ctx) {
+
         // Access token and shop available in ctx.state.shopify
         const { shop, accessToken, scope } = ctx.state.shopify;
         const host = ctx.query.host;
@@ -189,6 +171,13 @@ app.prepare().then(async () => {
     //   return;
     // }
 
+      // this is part of the installation process
+      // might need to be removed
+      //redirects 
+      
+      //----------
+
+      //TODO - re check this - it's Mongo specific with ShopModel
     if (useOfflineAccessToken) {
       const isInstalled = await ShopModel.countDocuments({ shop });
 
@@ -214,6 +203,10 @@ app.prepare().then(async () => {
         await handleRequest(ctx);
       }
     }
+
+    //--------------  
+    // quaratined above 
+
   });
 
   server.use(router.allowedMethods());
